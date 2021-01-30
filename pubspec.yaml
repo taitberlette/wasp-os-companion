@@ -26,8 +26,6 @@ dependencies:
 
   permission_handler: ^4.2.0+hotfix.3
 
-  flutter_blue: ^0.7.3
-
   path_provider:
 
   cupertino_icons: ^1.0.0

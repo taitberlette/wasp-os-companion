@@ -39,64 +39,51 @@ public class MainActivity extends FlutterActivity {
     }
 
     @Override
-    protected void onCreate(Bundle savedInstanceState){
+    protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-
 
         context = getApplicationContext();
 
-        forService = new Intent(MainActivity.this,MyService.class);
+        forService = new Intent(MainActivity.this, MyService.class);
 
         channel = new MethodChannel(getFlutterEngine().getDartExecutor().getBinaryMessenger(), "io.github.taitberlette.wasp_os_companion/messages");
-
-
 
         channel.setMethodCallHandler(new MethodChannel.MethodCallHandler() {
 
             @Override
             public void onMethodCall(@NonNull MethodCall call, @NonNull MethodChannel.Result result) {
 
-
-                if(call.method.equals("startBackgroundService")){
+                if (call.method.equals("startBackgroundService")) {
                     startBackgroundService();
                     result.success("startBackgroundService");
-                }else if(call.method.equals("stopBackgroundService")){
+                } else if (call.method.equals("stopBackgroundService")) {
                     stopBackgroundService();
                     result.success("stopBackgroundService");
-                }else if(call.method.equals("connectToBluetooth")){
-
-                    String address = call.argument("address").toString();
-
-
+                } else if (call.method.equals("connectToBluetooth")) {
                     Intent intent = new Intent(context, MyService.class);
                     intent.setAction("io.github.taitberlette.wasp_os_companion.connectToBluetooth");
-                    intent.putExtra("io.github.taitberlette.wasp_os_companion.connectToBluetooth.address", address);
                     startService(intent);
 
-                }else if(call.method.equals("writeToBluetooth")){
-
+                } else if (call.method.equals("writeToBluetooth")) {
                     String data = call.argument("data").toString();
-
-
                     Intent intent = new Intent(context, MyService.class);
                     intent.setAction("io.github.taitberlette.wasp_os_companion.writeToBluetooth");
                     intent.putExtra("io.github.taitberlette.wasp_os_companion.writeToBluetooth.data", data);
                     startService(intent);
 
-                }else if(call.method.equals("disconnectFromBluetooth")){
+                } else if (call.method.equals("disconnectFromBluetooth")) {
                     Intent intent = new Intent(context, MyService.class);
                     intent.setAction("io.github.taitberlette.wasp_os_companion.disconnectFromBluetooth");
                     startService(intent);
-                }else if(call.method.equals("connectedToChannel")){
+                } else if (call.method.equals("connectedToChannel")) {
 
-                    if(!isNotificationServiceEnabled()){
+                    if (!isNotificationServiceEnabled()) {
                         channel.invokeMethod("askNotifications", null);
                     }
 
-                }else if(call.method.equals("acceptNotifications")){
+                } else if (call.method.equals("acceptNotifications")) {
                     startActivity(new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"));
-                }else{
+                } else {
                     result.notImplemented();
                 }
             }
@@ -104,6 +91,7 @@ public class MainActivity extends FlutterActivity {
 
         IntentFilter iF = new IntentFilter();
         iF.addAction("io.github.taitberlette.wasp_os_companion.watchConnected");
+        iF.addAction("io.github.taitberlette.wasp_os_companion.watchConnecting");
         iF.addAction("io.github.taitberlette.wasp_os_companion.watchDisconnected");
         iF.addAction("io.github.taitberlette.wasp_os_companion.watchServicesDiscovered");
         iF.addAction("io.github.taitberlette.wasp_os_companion.watchResponse");
@@ -113,17 +101,22 @@ public class MainActivity extends FlutterActivity {
         receiver = new BackgroundReceiver();
         registerReceiver(receiver, iF);
 
-
         Intent intent = new Intent(context, MyService.class);
         intent.setAction("io.github.taitberlette.wasp_os_companion.checkBluetooth");
         startService(intent);
 
     }
 
-    private void startBackgroundService(){
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O){
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        unregisterReceiver(receiver);
+    }
+
+    private void startBackgroundService() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(forService);
-        }else{
+        } else {
             startService(forService);
         }
 
@@ -134,14 +127,13 @@ public class MainActivity extends FlutterActivity {
         startService(intentNotificationListener);
     }
 
-    private void stopBackgroundService(){
+    private void stopBackgroundService() {
         stopService(forService);
     }
 
-    private boolean isNotificationServiceEnabled(){
+    private boolean isNotificationServiceEnabled() {
         String pkgName = getPackageName();
-        final String flat = Settings.Secure.getString(getContentResolver(),
-                "enabled_notification_listeners");
+        final String flat = Settings.Secure.getString(getContentResolver(), "enabled_notification_listeners");
         if (!TextUtils.isEmpty(flat)) {
             final String[] names = flat.split(":");
             for (int i = 0; i < names.length; i++) {
@@ -163,17 +155,25 @@ public class MainActivity extends FlutterActivity {
 
             String action = intent.getAction();
 
-            if(channel == null){
+            if (channel == null) {
                 return;
             }
 
             String method = null;
-            HashMap<String, Object> data = null;
+            HashMap < String,
+                    Object > data = null;
 
-            switch(action){
+            switch (action) {
                 case "io.github.taitberlette.wasp_os_companion.watchConnected":
                     method = "watchConnected";
-                    data = new HashMap<String, Object>();
+                    data = new HashMap < String,
+                            Object > ();
+                    data.put("data", intent.getStringExtra("io.github.taitberlette.wasp_os_companion.data"));
+                    break;
+                case "io.github.taitberlette.wasp_os_companion.watchConnecting":
+                    method = "watchConnecting";
+                    data = new HashMap < String,
+                            Object > ();
                     data.put("data", intent.getStringExtra("io.github.taitberlette.wasp_os_companion.data"));
                     break;
                 case "io.github.taitberlette.wasp_os_companion.watchDisconnected":
@@ -184,29 +184,31 @@ public class MainActivity extends FlutterActivity {
                     break;
                 case "io.github.taitberlette.wasp_os_companion.watchCommand":
                     method = "watchCommand";
-                    data = new HashMap<String, Object>();
+                    data = new HashMap < String,
+                            Object > ();
                     data.put("data", intent.getStringExtra("io.github.taitberlette.wasp_os_companion.data"));
                     break;
                 case "io.github.taitberlette.wasp_os_companion.watchResponse":
                     method = "watchResponse";
-                    data = new HashMap<String, Object>();
+                    data = new HashMap < String,
+                            Object > ();
                     data.put("main", intent.getStringExtra("io.github.taitberlette.wasp_os_companion.main"));
                     data.put("extra", intent.getStringExtra("io.github.taitberlette.wasp_os_companion.extra"));
                     break;
                 case "io.github.taitberlette.wasp_os_companion.watchUart":
                     method = "watchUart";
-                    data = new HashMap<String, Object>();
+                    data = new HashMap < String,
+                            Object > ();
                     data.put("data", intent.getStringExtra("io.github.taitberlette.wasp_os_companion.data"));
                     break;
                 default:
                     break;
             }
 
-            channel.invokeMethod(method, data, new MethodChannel.Result(){
-                @Override
-                public void success(@Nullable Object result) {
+            channel.invokeMethod(method, data, new MethodChannel.Result() {@Override
+            public void success(@Nullable Object result) {
 
-                }
+            }
 
                 @Override
                 public void error(String errorCode, @Nullable String errorMessage, @Nullable Object errorDetails) {

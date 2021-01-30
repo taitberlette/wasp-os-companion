@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter_blue/flutter_blue.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -60,15 +59,8 @@ class _Home extends State<Home> {
   String actionText = "";
   String commandText = "";
 
-  // Bluetooth variables
-  FlutterBlue flutterBlue = FlutterBlue.instance;
-  final String uartServiceUUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-  final String uartRXUUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
-  final String uartTXUUID = "6e400003-b5a3-f393-e0a9-e50e24dcca9e";
+  // Device variables
   String watch;
-  BluetoothService uartService;
-  BluetoothCharacteristic uartRX;
-  BluetoothCharacteristic uartTX;
   int connectingState = 0;
 
   // Timer variables
@@ -144,15 +136,21 @@ class _Home extends State<Home> {
         });
         _updatePhoneSystem();
         break;
+      case "watchConnecting":
+        setState(() {
+          connectingState = 2;
+          try {
+            watch = call.arguments["data"];
+          } catch (e) {
+            watch = "unknown wasp-os watch";
+          }
+        });
+        break;
       case "watchDisconnected":
-        if ((connectingState == 2 ||
-            connectingState == 3 ||
-            connectingState == 4)) {
-          setState(() {
-            connectingState = 0;
-            watch = null;
-          });
-        }
+        setState(() {
+          connectingState = 0;
+          watch = null;
+        });
         break;
       case "watchCommand":
         _handleCommand(call.arguments["data"]);
@@ -224,17 +222,13 @@ class _Home extends State<Home> {
 
   // This function disconnects the watch, if it is connected
   void _disconnect() async {
-    if (watch == null || (connectingState != 3 && connectingState != 4)) {
-      return;
-    }
+    setState(() {
+      connectingState = 0;
+    });
 
     methodChannel.invokeMethod("disconnectFromBluetooth");
 
     watch = null;
-
-    setState(() {
-      connectingState = 0;
-    });
   }
 
   // This function finds and connects a wasp-os watch, if none are connected
@@ -248,34 +242,7 @@ class _Home extends State<Home> {
       connectingState = 1;
     });
 
-    flutterBlue.scanResults.listen((results) {
-      for (ScanResult r in results) {
-        if (connectingState != 1) {
-          continue;
-        }
-        if (r.device.name == "P8" ||
-            r.device.name == "PineTime" ||
-            r.device.name == "K9") {
-          methodChannel.invokeMethod("connectToBluetooth",
-              <String, dynamic>{"address": r.device.id.id});
-          setState(() {
-            connectingState = 2;
-            watch = r.device.name;
-          });
-          flutterBlue.stopScan();
-        }
-      }
-    });
-
-    await flutterBlue.startScan(timeout: Duration(seconds: 4));
-
-    flutterBlue.stopScan();
-
-    if (connectingState == 1) {
-      setState(() {
-        connectingState = 0;
-      });
-    }
+    methodChannel.invokeMethod("connectToBluetooth");
   }
 
   // This function updates the time on the watch, and retrives the application ring
@@ -966,19 +933,9 @@ class _Home extends State<Home> {
         ),
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => {
-          connectingState == 3 || connectingState == 4
-              ? _disconnect()
-              : _connect()
-        },
-        tooltip: connectingState == 3 || connectingState == 4
-            ? 'Disconnect'
-            : 'Connect',
-        child: Icon(connectingState == 3 || connectingState == 4
-            ? Icons.close
-            : connectingState == 2 || connectingState == 1
-                ? Icons.more_horiz
-                : Icons.sync),
+        onPressed: () => {connectingState != 0 ? _disconnect() : _connect()},
+        tooltip: connectingState != 0 ? 'Disconnect' : 'Connect',
+        child: Icon(connectingState != 0 ? Icons.close : Icons.sync),
         focusElevation: 30,
       ),
     );
