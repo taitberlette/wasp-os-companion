@@ -299,13 +299,17 @@ class _Home extends State<Home> {
           ? _appPath("ClockApp", 0)
           : _appPath("FibonacciClockApp", 0) != ""
               ? _appPath("FibonacciClockApp", 0)
-              : _appPath("ChronoApp", 0);
+              : _appPath("ChronoApp", 0) != ""
+                  ? _appPath("ChronoApp", 0)
+                  : _appPath("WordClockApp", 0);
 
       clockFaceId = _appPath("ClockApp", 0) != ""
           ? 1
           : _appPath("FibonacciClockApp", 0) != ""
               ? 2
-              : 3;
+              : _appPath("ChronoApp", 0) != ""
+                  ? 3
+                  : 4;
     });
 
     if (_appPath("AlarmApp") != "") {
@@ -678,6 +682,10 @@ class _Home extends State<Home> {
                                                       child: Text(
                                                           "Analogue Clock"),
                                                       value: 3,
+                                                    ),
+                                                    DropdownMenuItem(
+                                                      child: Text("Word Clock"),
+                                                      value: 4,
                                                     )
                                                   ],
                                                   onChanged: (value) {
@@ -698,6 +706,11 @@ class _Home extends State<Home> {
                                                             "from apps.chrono import ChronoApp");
                                                         _sendString(
                                                             "$clockPath = ChronoApp()");
+                                                      } else if (value == 4) {
+                                                        _sendString(
+                                                            "from apps.word_clock import WordClockApp");
+                                                        _sendString(
+                                                            "$clockPath = WordClockApp()");
                                                       }
                                                       _sendString(
                                                           "wasp.system.switch($clockPath)");
