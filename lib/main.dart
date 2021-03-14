@@ -7,6 +7,16 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import './widgets/watch_apps/alarm_widget.dart';
+import './widgets/watch_apps/clock_widget.dart';
+import './widgets/watch_apps/steps_widget.dart';
+import './widgets/watch_apps/settings_widget.dart';
+import './widgets/watch_apps/uart_widget.dart';
+
+import './widgets/header_widget.dart';
+import './widgets/status_widget.dart';
+import './widgets/location_widget.dart';
+
 void main() async {
   // Run the application
   runApp(MyApp());
@@ -525,421 +535,76 @@ class _Home extends State<Home> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SizedBox(height: 25),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  mainAxisSize: MainAxisSize.max,
-                  children: [
-                    RichText(
-                      text: TextSpan(
-                          text: 'wasp-os ',
-                          style: TextStyle(fontSize: 24, color: Colors.black),
-                          children: <TextSpan>[
-                            TextSpan(
-                              text: 'companion',
-                              style: TextStyle(
-                                  fontSize: 24, color: Colors.black45),
-                            ),
-                          ]),
-                    ),
-                  ],
-                ),
+                HeaderWidget(),
                 SizedBox(height: 25),
                 _locationPermissionStatus != PermissionStatus.granted
-                    ? Column(
-                        children: [
-                          SizedBox(height: 25),
-                          Text(
-                            "Sorry, we need location permissions in order to connect to a wasp-os device.",
-                            style: TextStyle(fontSize: 16, color: Colors.black),
-                          ),
-                          SizedBox(height: 25),
-                        ],
-                      )
+                    ? LocationWidget()
                     : connectingState == 4
                         ? Column(
                             children: [
                               _appPath("AlarmApp") != ""
-                                  ? SizedBox(
-                                      width: double.infinity,
-                                      child: Column(
-                                        children: [
-                                          Divider(height: 16),
-                                          SizedBox(height: 15),
-                                          Text("Alarm",
-                                              style: TextStyle(
-                                                  fontSize: 16,
-                                                  color: Colors.black)),
-                                          SizedBox(height: 20),
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text("Enabled:",
-                                                  style: TextStyle(
-                                                      fontSize: 14,
-                                                      color: Colors.black)),
-                                              Checkbox(
-                                                  value: alarmAppEnabled,
-                                                  onChanged: (value) {
-                                                    setState(() {
-                                                      alarmAppEnabled = value;
-                                                    });
-
-                                                    _sendString(
-                                                        "${_appPath("AlarmApp")}.active.state = ${value ? "True" : "False"}");
-
-                                                    _sendString(
-                                                        "${_appPath("AlarmApp")}._set_current_alarm()");
-
-                                                    _sendString(
-                                                        "wasp.system.app._draw()");
-                                                  }),
-                                            ],
-                                          ),
-                                          Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              children: [
-                                                Text("Time:    ",
-                                                    style: TextStyle(
-                                                        fontSize: 14,
-                                                        color: Colors.black)),
-                                                OutlinedButton(
-                                                    child: Text(alarmAppTime),
-                                                    onPressed: () async {
-                                                      final TimeOfDay time =
-                                                          await showTimePicker(
-                                                        context: context,
-                                                        initialTime:
-                                                            TimeOfDay.now(),
-                                                      );
-                                                      if (time != null)
-                                                        setState(() {
-                                                          alarmAppHours =
-                                                              time.hour;
-                                                          alarmAppMinutes =
-                                                              time.minute;
-                                                          alarmAppTime = time
-                                                              .format(context);
-                                                        });
-
-                                                      _sendString(
-                                                          "${_appPath("AlarmApp")}.hours.value = $alarmAppHours");
-
-                                                      _sendString(
-                                                          "${_appPath("AlarmApp")}.minutes.value = $alarmAppMinutes");
-
-                                                      _sendString(
-                                                          "${_appPath("AlarmApp")}._set_current_alarm()");
-
-                                                      _sendString(
-                                                          "wasp.system.app._draw()");
-                                                    })
-                                              ]),
-                                        ],
-                                      ),
+                                  ? AlarmWidget(
+                                      sendString: _sendString,
+                                      appPath: _appPath,
+                                      enabled: alarmAppEnabled,
+                                      hours: alarmAppHours,
+                                      minutes: alarmAppMinutes,
+                                      time: alarmAppTime,
+                                      onChanged:
+                                          (enabled, hours, minutes, time) => {
+                                        setState(() {
+                                          alarmAppEnabled = enabled;
+                                          alarmAppHours = hours;
+                                          alarmAppMinutes = minutes;
+                                          alarmAppTime = time;
+                                        })
+                                      },
                                     )
                                   : (Container()),
                               clockPath != ""
-                                  ? SizedBox(
-                                      width: double.infinity,
-                                      child: Column(
-                                        children: [
-                                          Divider(height: 16),
-                                          SizedBox(height: 15),
-                                          Text("Clock",
-                                              style: TextStyle(
-                                                  fontSize: 16,
-                                                  color: Colors.black)),
-                                          SizedBox(height: 20),
-                                          Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              children: [
-                                                Text("Clock Face:",
-                                                    style: TextStyle(
-                                                        fontSize: 14,
-                                                        color: Colors.black)),
-                                                DropdownButton(
-                                                  style: TextStyle(
-                                                      fontSize: 14,
-                                                      color: Colors.black),
-                                                  value: clockFaceId,
-                                                  items: [
-                                                    DropdownMenuItem(
-                                                      child:
-                                                          Text("Digital Clock"),
-                                                      value: 1,
-                                                    ),
-                                                    DropdownMenuItem(
-                                                      child: Text(
-                                                          "Fibonacci Clock"),
-                                                      value: 2,
-                                                    ),
-                                                    DropdownMenuItem(
-                                                      child: Text(
-                                                          "Analogue Clock"),
-                                                      value: 3,
-                                                    ),
-                                                    DropdownMenuItem(
-                                                      child: Text("Word Clock"),
-                                                      value: 4,
-                                                    )
-                                                  ],
-                                                  onChanged: (value) {
-                                                    setState(() {
-                                                      clockFaceId = value;
-                                                      if (value == 1) {
-                                                        _sendString(
-                                                            "from apps.clock import ClockApp");
-                                                        _sendString(
-                                                            "$clockPath = ClockApp()");
-                                                      } else if (value == 2) {
-                                                        _sendString(
-                                                            "from apps.fibonacci_clock import FibonacciClockApp");
-                                                        _sendString(
-                                                            "$clockPath = FibonacciClockApp()");
-                                                      } else if (value == 3) {
-                                                        _sendString(
-                                                            "from apps.chrono import ChronoApp");
-                                                        _sendString(
-                                                            "$clockPath = ChronoApp()");
-                                                      } else if (value == 4) {
-                                                        _sendString(
-                                                            "from apps.word_clock import WordClockApp");
-                                                        _sendString(
-                                                            "$clockPath = WordClockApp()");
-                                                      }
-                                                      _sendString(
-                                                          "wasp.system.switch($clockPath)");
-                                                    });
-                                                  },
-                                                  hint: Text(
-                                                      "Select a clock face."),
-                                                ),
-                                              ]),
-                                        ],
-                                      ),
-                                    )
+                                  ? ClockWidget(
+                                      sendString: _sendString,
+                                      appPath: _appPath,
+                                      faceId: clockFaceId,
+                                      clockPath: clockPath,
+                                      onChanged: (faceId) => {
+                                            setState(() {
+                                              clockFaceId = faceId;
+                                            })
+                                          })
                                   : (Container()),
                               _appPath("StepCounterApp") != ""
-                                  ? SizedBox(
-                                      width: double.infinity,
-                                      child: Column(
-                                        children: [
-                                          Divider(height: 16),
-                                          SizedBox(height: 15),
-                                          Text("Steps",
-                                              style: TextStyle(
-                                                  fontSize: 16,
-                                                  color: Colors.black)),
-                                          SizedBox(height: 20),
-                                          Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              children: [
-                                                Text("Steps:",
-                                                    style: TextStyle(
-                                                        fontSize: 14,
-                                                        color: Colors.black)),
-                                                Text("$steps",
-                                                    style: TextStyle(
-                                                        fontSize: 14,
-                                                        color: Colors.black))
-                                              ]),
-                                          SizedBox(height: 20),
-                                          Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment
-                                                      .spaceBetween,
-                                              children: [
-                                                Text("Steps History:",
-                                                    style: TextStyle(
-                                                        fontSize: 14,
-                                                        color: Colors.black)),
-                                              ]),
-                                          SizedBox(height: 10),
-                                          SizedBox(
-                                            height: 125,
-                                            child: ListView.builder(
-                                              padding: EdgeInsets.zero,
-                                              shrinkWrap: true,
-                                              itemCount: stepsHistoryMap
-                                                          .keys.length !=
-                                                      null
-                                                  ? stepsHistoryMap.keys.length
-                                                  : 0,
-                                              itemBuilder: (context, index) {
-                                                return ListTile(
-                                                  contentPadding:
-                                                      EdgeInsets.zero,
-                                                  title: Text(
-                                                    '${stepsHistoryMap.keys.elementAt(index) != null ? stepsHistoryMap.keys.elementAt(index).toString() : ""} ',
-                                                    style: new TextStyle(
-                                                        fontSize: 14),
-                                                  ),
-                                                  trailing: Text(
-                                                    '${stepsHistoryMap.values.elementAt(index) != null ? stepsHistoryMap.values.elementAt(index).toString() : ""} ',
-                                                    style: new TextStyle(
-                                                        fontSize: 14),
-                                                  ),
-                                                  dense: true,
-                                                );
-                                              },
-                                            ),
-                                          ),
-                                          SizedBox(height: 20),
-                                        ],
-                                      ),
-                                    )
+                                  ? StepsWidget(
+                                      sendString: _sendString,
+                                      appPath: _appPath,
+                                      steps: steps,
+                                      history: stepsHistoryMap)
                                   : (Container()),
-                              SizedBox(
-                                width: double.infinity,
-                                child: Column(
-                                  children: [
-                                    Divider(height: 16),
-                                    SizedBox(height: 15),
-                                    Text("Settings",
-                                        style: TextStyle(
-                                            fontSize: 16, color: Colors.black)),
-                                    SizedBox(height: 20),
-                                    Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text("Brightness:",
-                                              style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.black)),
-                                          Slider(
-                                            value: brightnessSlider,
-                                            min: 1,
-                                            max: 3,
-                                            divisions: 2,
-                                            label: brightnessSlider
-                                                .round()
-                                                .toString(),
-                                            onChanged: (value) {
-                                              if (value == brightnessSlider) {
-                                                return;
-                                              }
-
-                                              setState(() {
-                                                brightnessSlider = value;
-                                              });
-                                              _sendString(
-                                                  "wasp.system.brightness = ${value.round()}");
-
-                                              _sendString(
-                                                  "wasp.system.app._draw()");
-                                            },
-                                          ),
-                                        ]),
-                                    Row(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.spaceBetween,
-                                        children: [
-                                          Text("Notification Level:",
-                                              style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.black)),
-                                          Slider(
-                                            value: notifySlider,
-                                            min: 1,
-                                            max: 3,
-                                            divisions: 2,
-                                            label:
-                                                notifySlider.round().toString(),
-                                            onChanged: (value) {
-                                              if (value == notifySlider) {
-                                                return;
-                                              }
-
-                                              setState(() {
-                                                notifySlider = value;
-                                              });
-                                              _sendString(
-                                                  "wasp.system.notify_level = ${value.round()}");
-
-                                              _sendString(
-                                                  "wasp.system.app._draw()");
-                                            },
-                                          )
-                                        ]),
-                                  ],
-                                ),
+                              SettingsWidget(
+                                sendString: _sendString,
+                                appPath: _appPath,
+                                brightness: brightnessSlider,
+                                notify: notifySlider,
+                                onChanged: (brightness, notify) => {
+                                  setState(() {
+                                    brightnessSlider = brightness;
+                                    notifySlider = notify;
+                                  })
+                                },
                               ),
-                              Column(children: [
-                                Divider(height: 16),
-                                SizedBox(height: 15),
-                                Column(
-                                  children: [
-                                    showConsole == true
-                                        ? (Column(children: [
-                                            Text("UART Console",
-                                                style: TextStyle(
-                                                    fontSize: 16,
-                                                    color: Colors.black)),
-                                            SizedBox(height: 20),
-                                            SizedBox(
-                                                height: 250,
-                                                child: SingleChildScrollView(
-                                                    controller:
-                                                        uartScrollController,
-                                                    scrollDirection:
-                                                        Axis.vertical,
-                                                    child:
-                                                        new Text(uartContent))),
-                                            TextField(
-                                              decoration: InputDecoration(
-                                                hintText: 'wasp.system.run()',
-                                              ),
-                                              style: TextStyle(
-                                                  fontSize: 16,
-                                                  color: Colors.black),
-                                              autocorrect: false,
-                                              onSubmitted: (String content) {
-                                                _sendString(content + "");
-                                              },
-                                            ),
-                                            SizedBox(height: 15),
-                                          ]))
-                                        : Container(),
-                                    OutlinedButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          showConsole = !showConsole;
-                                        });
-                                      },
-                                      child: Text(
-                                          "${showConsole == true ? "Hide" : "Show"} UART Console"),
-                                    ),
-                                    SizedBox(height: 15),
-                                  ],
-                                ),
-                              ])
+                              UartWidget(
+                                sendString: _sendString,
+                                appPath: _appPath,
+                                show: showConsole,
+                                content: uartContent,
+                                scrollController: uartScrollController,
+                                onChanged: (show) => {
+                                  setState(() => {showConsole = show})
+                                },
+                              )
                             ],
                           )
-                        : (Column(
-                            children: [
-                              SizedBox(height: 25),
-                              Text(
-                                connectingState == 0
-                                    ? "Connect a wasp-os device to view data."
-                                    : connectingState == 1
-                                        ? "Searching for wasp-os devices..."
-                                        : connectingState == 2
-                                            ? "Connecting to ${watch == null ? "unknown wasp-os device" : watch}..."
-                                            : "Syncing ${watch == null ? "unknown wasp-os device" : watch}...",
-                                style: TextStyle(
-                                    fontSize: 16, color: Colors.black),
-                              ),
-                              SizedBox(height: 25),
-                            ],
-                          )),
+                        : (StatusWidget(state: connectingState, watch: watch)),
               ],
             ),
           ),
