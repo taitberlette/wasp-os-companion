@@ -83,7 +83,7 @@ class _AlarmWidgetState extends State<AlarmWidget> {
                     context: context,
                     initialTime: TimeOfDay.now(),
                   );
-                  if (time != null)
+                  if (timePicker != null)
                     setState(() {
                       hours = timePicker.hour;
                       minutes = timePicker.minute;
