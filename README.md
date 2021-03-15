@@ -37,7 +37,7 @@ I only have a P8 smartwatch, so I haven't tested with PineTime or K9. Please mak
 
 ## Screenshots
            
-<img src=".screenshots/Home.png" width="240" height="504"> <img src=".screenshots/Alarm_and_Clock_and_Steps.png" width="240" height="504"> <img src=".screenshots/UART_Console_and_Settings.png" width="240" height="504"> <img src=".screenshots/Alarm_Time_Picker.png" width="240" height="504"> <img src=".screenshots/Clock_Picker.png" width="240" height="504"> <img src=".screenshots/UART_Demo.png" width="240" height="504">
+<img src=".screenshots/Home.png" width="240" height="504"> <img src=".screenshots/Alarm_and_Clock_and_Steps.png" width="240" height="504"> <img src=".screenshots/UART_Console_and_Settings.png" width="240" height="504"> <img src=".screenshots/Alarm_Time_Picker.png" width="240" height="504"> <img src=".screenshots/Clock_Picker.png" width="240" height="504"> <img src=".screenshots/Theme_Picker.png" width="240" height="504"> <img src=".screenshots/UART_Demo.png" width="240" height="504">
 
 
 
