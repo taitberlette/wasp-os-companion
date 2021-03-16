@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import './widgets/device_widget.dart';
 import './widgets/watch_apps/alarm_widget.dart';
 import './widgets/watch_apps/clock_widget.dart';
 import './widgets/watch_apps/steps_widget.dart';
@@ -72,6 +73,10 @@ class _Home extends State<Home> {
   // Device variables
   String watch;
   int connectingState = 0;
+  int batteryLevel = 0;
+
+  // Sync variables
+  DateTime lastSync = DateTime.now();
 
   // Timer variables
   Timer syncTimer;
@@ -342,9 +347,13 @@ class _Home extends State<Home> {
 
     _sendString("wasp.system.notify_level");
 
+    _sendString("watch.battery.level()");
+
     setState(() {
       connectingState = 4;
     });
+
+    lastSync = DateTime.now();
   }
 
   // This function gets a file from our application directory
@@ -462,6 +471,11 @@ class _Home extends State<Home> {
     }
     if (command == "wasp.system.launcher_ring") {
       parseRing(text, 1);
+    }
+    if (command == "watch.battery.level()") {
+      setState(() {
+        batteryLevel = int.parse(text);
+      });
     }
     if (command == "${_appPath("AlarmApp")}.hours.value") {
       setState(() {
@@ -582,6 +596,13 @@ class _Home extends State<Home> {
                       : connectingState == 4
                           ? Column(
                               children: [
+                                DeviceWidget(
+                                  sendString: _sendString,
+                                  appPath: _appPath,
+                                  name: watch,
+                                  batteryLevel: batteryLevel,
+                                  lastSync: lastSync,
+                                ),
                                 _appPath("AlarmApp") != ""
                                     ? AlarmWidget(
                                         sendString: _sendString,
