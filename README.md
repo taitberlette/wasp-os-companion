@@ -17,6 +17,7 @@ To install the app, check [Github Actions](https://github.com/tb100/wasp-os-comp
  - Change clock face.
  - View steps (with history).
  - Change watch settings (brightness/notification level).
+ - Change the watch theme.
  - Automatically sync the time.
  - UART console.
  - Save/load snake game high score.

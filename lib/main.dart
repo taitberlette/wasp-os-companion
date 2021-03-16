@@ -109,6 +109,9 @@ class _Home extends State<Home> {
   // MethodChannel (talk to native code)
   MethodChannel methodChannel;
 
+  //MemoryError
+  bool memoryError = false;
+
   // Runs when the app is started
   @override
   void initState() {
@@ -119,8 +122,8 @@ class _Home extends State<Home> {
     methodChannel.invokeMethod("connectedToChannel");
 
     _checkPermissions();
-    syncTimer =
-        Timer.periodic(Duration(minutes: 1), (Timer t) => _updatePhoneSystem());
+    syncTimer = Timer.periodic(
+        Duration(minutes: 30), (Timer t) => _updatePhoneSystem());
 
     super.initState();
   }
@@ -292,6 +295,7 @@ class _Home extends State<Home> {
     haltCommands = false;
     responseText = "";
     commandText = "";
+    memoryError = false;
 
     DateTime now = new DateTime.now();
     _sendString(
@@ -337,8 +341,6 @@ class _Home extends State<Home> {
     _sendString("wasp.system.brightness");
 
     _sendString("wasp.system.notify_level");
-
-    _sendString("wasp.system.app._draw()");
 
     setState(() {
       connectingState = 4;
@@ -420,9 +422,30 @@ class _Home extends State<Home> {
   void _handleResponse(String text, String command) async {
     command = command.trim();
 
-    if (text.startsWith("Traceback")) {
+    if (text.trim().startsWith("Traceback")) {
       return;
     }
+
+    if (text.trim().startsWith("MemoryError")) {
+      if (memoryError) {
+        return;
+      }
+      final snackBar = SnackBar(
+        duration: Duration(minutes: 10),
+        behavior: SnackBarBehavior.fixed,
+        content: Text('Your watch is running low on memory.'),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+
+      memoryError = true;
+
+      // Try again after 10 minutes (if the user disconnects and reconnects the watch it will also reset)
+      new Future.delayed(
+          const Duration(minutes: 10), () => {memoryError = false});
+
+      return;
+    }
+    memoryError = false;
 
     if (command == "wasp.system.brightness") {
       setState(() {
@@ -511,12 +534,27 @@ class _Home extends State<Home> {
 
   // This function sends a string to the watch
   void _sendString(String text) {
-    if (watch == null || (connectingState != 3 && connectingState != 4)) {
+    if (watch == null ||
+        (connectingState != 3 && connectingState != 4) ||
+        memoryError) {
       return;
     }
 
     methodChannel
         .invokeMethod("writeToBluetooth", <String, dynamic>{"data": text});
+  }
+
+  // The function starts a sync, and shows the refreshing circle for three seconds (about how long a sync takes).
+  Future<void> _manualSync() async {
+    if (watch == null ||
+        (connectingState != 3 && connectingState != 4) ||
+        memoryError) {
+      return;
+    }
+
+    _updatePhoneSystem();
+
+    await Future.delayed(Duration(seconds: 3));
   }
 
   // This is the UI for the app
@@ -526,86 +564,90 @@ class _Home extends State<Home> {
       key: _scaffoldKey,
       body: Material(
         animationDuration: new Duration(seconds: 1),
-        child: SingleChildScrollView(
-          scrollDirection: Axis.vertical,
-          physics: ClampingScrollPhysics(),
-          child: Container(
-            padding: const EdgeInsets.only(left: 25, right: 25, top: 48),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(height: 25),
-                HeaderWidget(),
-                SizedBox(height: 25),
-                _locationPermissionStatus != PermissionStatus.granted
-                    ? LocationWidget()
-                    : connectingState == 4
-                        ? Column(
-                            children: [
-                              _appPath("AlarmApp") != ""
-                                  ? AlarmWidget(
-                                      sendString: _sendString,
-                                      appPath: _appPath,
-                                      enabled: alarmAppEnabled,
-                                      hours: alarmAppHours,
-                                      minutes: alarmAppMinutes,
-                                      time: alarmAppTime,
-                                      onChanged:
-                                          (enabled, hours, minutes, time) => {
-                                        setState(() {
-                                          alarmAppEnabled = enabled;
-                                          alarmAppHours = hours;
-                                          alarmAppMinutes = minutes;
-                                          alarmAppTime = time;
-                                        })
-                                      },
-                                    )
-                                  : (Container()),
-                              clockPath != ""
-                                  ? ClockWidget(
-                                      sendString: _sendString,
-                                      appPath: _appPath,
-                                      faceId: clockFaceId,
-                                      clockPath: clockPath,
-                                      onChanged: (faceId) => {
-                                            setState(() {
-                                              clockFaceId = faceId;
-                                            })
+        child: RefreshIndicator(
+          onRefresh: _manualSync,
+          child: SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            physics: ClampingScrollPhysics(),
+            child: Container(
+              padding: const EdgeInsets.only(left: 25, right: 25, top: 48),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SizedBox(height: 25),
+                  HeaderWidget(),
+                  SizedBox(height: 25),
+                  _locationPermissionStatus != PermissionStatus.granted
+                      ? LocationWidget()
+                      : connectingState == 4
+                          ? Column(
+                              children: [
+                                _appPath("AlarmApp") != ""
+                                    ? AlarmWidget(
+                                        sendString: _sendString,
+                                        appPath: _appPath,
+                                        enabled: alarmAppEnabled,
+                                        hours: alarmAppHours,
+                                        minutes: alarmAppMinutes,
+                                        time: alarmAppTime,
+                                        onChanged:
+                                            (enabled, hours, minutes, time) => {
+                                          setState(() {
+                                            alarmAppEnabled = enabled;
+                                            alarmAppHours = hours;
+                                            alarmAppMinutes = minutes;
+                                            alarmAppTime = time;
                                           })
-                                  : (Container()),
-                              _appPath("StepCounterApp") != ""
-                                  ? StepsWidget(
-                                      sendString: _sendString,
-                                      appPath: _appPath,
-                                      steps: steps,
-                                      history: stepsHistoryMap)
-                                  : (Container()),
-                              SettingsWidget(
-                                sendString: _sendString,
-                                appPath: _appPath,
-                                brightness: brightnessSlider,
-                                notify: notifySlider,
-                                onChanged: (brightness, notify) => {
-                                  setState(() {
-                                    brightnessSlider = brightness;
-                                    notifySlider = notify;
-                                  })
-                                },
-                              ),
-                              UartWidget(
-                                sendString: _sendString,
-                                appPath: _appPath,
-                                show: showConsole,
-                                content: uartContent,
-                                scrollController: uartScrollController,
-                                onChanged: (show) => {
-                                  setState(() => {showConsole = show})
-                                },
-                              )
-                            ],
-                          )
-                        : (StatusWidget(state: connectingState, watch: watch)),
-              ],
+                                        },
+                                      )
+                                    : (Container()),
+                                clockPath != ""
+                                    ? ClockWidget(
+                                        sendString: _sendString,
+                                        appPath: _appPath,
+                                        faceId: clockFaceId,
+                                        clockPath: clockPath,
+                                        onChanged: (faceId) => {
+                                              setState(() {
+                                                clockFaceId = faceId;
+                                              })
+                                            })
+                                    : (Container()),
+                                _appPath("StepCounterApp") != ""
+                                    ? StepsWidget(
+                                        sendString: _sendString,
+                                        appPath: _appPath,
+                                        steps: steps,
+                                        history: stepsHistoryMap)
+                                    : (Container()),
+                                SettingsWidget(
+                                  sendString: _sendString,
+                                  appPath: _appPath,
+                                  brightness: brightnessSlider,
+                                  notify: notifySlider,
+                                  onChanged: (brightness, notify) => {
+                                    setState(() {
+                                      brightnessSlider = brightness;
+                                      notifySlider = notify;
+                                    })
+                                  },
+                                ),
+                                UartWidget(
+                                  sendString: _sendString,
+                                  appPath: _appPath,
+                                  show: showConsole,
+                                  content: uartContent,
+                                  scrollController: uartScrollController,
+                                  onChanged: (show) => {
+                                    setState(() => {showConsole = show})
+                                  },
+                                )
+                              ],
+                            )
+                          : (StatusWidget(
+                              state: connectingState, watch: watch)),
+                ],
+              ),
             ),
           ),
         ),
