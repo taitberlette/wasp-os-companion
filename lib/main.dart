@@ -1,11 +1,16 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:io';
+import 'package:archive/archive.dart';
+import 'package:archive/archive_io.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_nordic_dfu/flutter_nordic_dfu.dart';
+import 'package:http/http.dart';
 
 import './widgets/device_widget.dart';
 import './widgets/watch_apps/alarm_widget.dart';
@@ -17,6 +22,7 @@ import './widgets/watch_apps/uart_widget.dart';
 import './widgets/header_widget.dart';
 import './widgets/status_widget.dart';
 import './widgets/location_widget.dart';
+import './widgets/upload_widget.dart';
 
 void main() async {
   // Run the application
@@ -72,6 +78,7 @@ class _Home extends State<Home> {
 
   // Device variables
   String watch;
+  String watchAddress;
   int connectingState = 0;
   int batteryLevel = 0;
 
@@ -117,6 +124,11 @@ class _Home extends State<Home> {
   //MemoryError
   bool memoryError = false;
 
+  //DFU
+  bool dfuRunning = false;
+  int dfuProgress = 0;
+  int uploadState = 0;
+
   // Runs when the app is started
   @override
   void initState() {
@@ -141,15 +153,167 @@ class _Home extends State<Home> {
     super.dispose();
   }
 
+  Future<void> downloadWebBuild(String type) async {
+    if (watch == null ||
+        (connectingState != 3 && connectingState != 4) ||
+        memoryError) {
+      return;
+    }
+    try {
+      setState(() {
+        dfuRunning = true;
+        dfuProgress = 0;
+        uploadState = 1;
+      });
+
+      Response res = await get(Uri.https(
+          'wasp-os-companion.glitch.me', 'api/$type/${watch.toLowerCase()}'));
+
+      if (res.statusCode != 200) {
+        throw "network error";
+      }
+
+      Map<String, dynamic> json = jsonDecode(res.body);
+
+      String url = json["url"];
+
+      if (url == "" || url == null) {
+        throw "file not found";
+      }
+
+      HttpClient client = new HttpClient();
+      dynamic fileReq = await client.getUrl(Uri.parse(url));
+      dynamic fileRes = await fileReq.close();
+      List<int> bytes = await consolidateHttpClientResponseBytes(fileRes);
+
+      Archive archive;
+
+      if (type == "actions") {
+        archive = ZipDecoder().decodeBytes(bytes);
+      } else {
+        List<int> archiveBytes = GZipDecoder().decodeBytes(bytes);
+        archive = TarDecoder().decodeBytes(archiveBytes);
+      }
+
+      dynamic micropython;
+
+      for (final file in archive) {
+        final filename = file.name;
+        if (file.isFile) {
+          if (type == "actions"
+              ? filename == "micropython.zip"
+              : filename
+                  .endsWith("build-${watch.toLowerCase()}/micropython.zip")) {
+            micropython = file.content as List<int>;
+          }
+        }
+      }
+      if (micropython == null) {
+        throw "micropython";
+      }
+
+      File micropythonZip = await _getFile("micropython.zip");
+      micropythonZip.writeAsBytesSync(micropython);
+
+      _sendString("import machine");
+      _sendString("machine.enter_ota_dfu()");
+      doDfu(watchAddress, micropythonZip.path);
+
+      await Future.delayed(Duration(seconds: 3));
+      _disconnect();
+    } catch (e) {
+      setState(() {
+        dfuRunning = false;
+        dfuProgress = 0;
+      });
+      final snackBar = SnackBar(
+        duration: Duration(minutes: 10),
+        behavior: SnackBarBehavior.fixed,
+        action: SnackBarAction(
+          label: "Retry",
+          onPressed: () {
+            downloadWebBuild(type);
+          },
+        ),
+        content: Text('Watch update failed!'),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+      print(e.toString());
+    }
+  }
+
+  Future<void> doDfu(String deviceId, String file) async {
+    setState(() {
+      dfuRunning = true;
+      dfuProgress = 0;
+      uploadState = 0;
+    });
+    String top = deviceId.substring(0, 15);
+    String value = deviceId.substring(15, 17);
+    int number = int.parse(value, radix: 16);
+    number++;
+    number = number & 0xFF;
+    value = number.toRadixString(16);
+    value = value.toUpperCase();
+
+    try {
+      String s = await FlutterNordicDfu.startDfu(
+        top + value,
+        file,
+        androidSpecialParameter:
+            AndroidSpecialParameter(disableNotification: true),
+        numberOfPackets: 20,
+        progressListener:
+            DefaultDfuProgressListenerAdapter(onProgressChangedHandle: (
+          deviceAddress,
+          percent,
+          speed,
+          avgSpeed,
+          currentPart,
+          partsTotal,
+        ) {
+          setState(() {
+            dfuProgress = percent;
+          });
+        }),
+      );
+      setState(() {
+        dfuRunning = false;
+        dfuProgress = 0;
+      });
+      _connect();
+    } catch (e) {
+      setState(() {
+        dfuRunning = false;
+        dfuProgress = 0;
+      });
+
+      final snackBar = SnackBar(
+        duration: Duration(minutes: 10),
+        behavior: SnackBarBehavior.fixed,
+        action: SnackBarAction(
+          label: "Retry",
+          onPressed: () {
+            doDfu(deviceId, file);
+          },
+        ),
+        content: Text('Watch update failed!'),
+      );
+      ScaffoldMessenger.of(context).showSnackBar(snackBar);
+      print(e.toString());
+    }
+  }
+
   Future<void> _handleMethodChannel(MethodCall call) {
     switch (call.method) {
       case "watchConnected":
         setState(() {
           connectingState = 3;
           try {
-            watch = call.arguments["data"];
+            watch = call.arguments["main"];
+            watchAddress = call.arguments["extra"];
           } catch (e) {
-            watch = "unknown wasp-os watch";
+            watch = "PineTime";
           }
         });
         _updatePhoneSystem();
@@ -160,7 +324,7 @@ class _Home extends State<Home> {
           try {
             watch = call.arguments["data"];
           } catch (e) {
-            watch = "unknown wasp-os watch";
+            watch = "PineTime";
           }
         });
         break;
@@ -593,92 +757,121 @@ class _Home extends State<Home> {
                   SizedBox(height: 25),
                   _locationPermissionStatus != PermissionStatus.granted
                       ? LocationWidget()
-                      : connectingState == 4
-                          ? Column(
-                              children: [
-                                DeviceWidget(
-                                  sendString: _sendString,
-                                  appPath: _appPath,
-                                  name: watch,
-                                  batteryLevel: batteryLevel,
-                                  lastSync: lastSync,
-                                ),
-                                _appPath("AlarmApp") != ""
-                                    ? AlarmWidget(
-                                        sendString: _sendString,
-                                        appPath: _appPath,
-                                        enabled: alarmAppEnabled,
-                                        hours: alarmAppHours,
-                                        minutes: alarmAppMinutes,
-                                        time: alarmAppTime,
-                                        onChanged:
-                                            (enabled, hours, minutes, time) => {
-                                          setState(() {
-                                            alarmAppEnabled = enabled;
-                                            alarmAppHours = hours;
-                                            alarmAppMinutes = minutes;
-                                            alarmAppTime = time;
-                                          })
-                                        },
-                                      )
-                                    : (Container()),
-                                clockPath != ""
-                                    ? ClockWidget(
-                                        sendString: _sendString,
-                                        appPath: _appPath,
-                                        faceId: clockFaceId,
-                                        clockPath: clockPath,
-                                        onChanged: (faceId) => {
-                                              setState(() {
-                                                clockFaceId = faceId;
-                                              })
-                                            })
-                                    : (Container()),
-                                _appPath("StepCounterApp") != ""
-                                    ? StepsWidget(
-                                        sendString: _sendString,
-                                        appPath: _appPath,
-                                        steps: steps,
-                                        history: stepsHistoryMap)
-                                    : (Container()),
-                                SettingsWidget(
-                                  sendString: _sendString,
-                                  appPath: _appPath,
-                                  brightness: brightnessSlider,
-                                  notify: notifySlider,
-                                  onChanged: (brightness, notify) => {
-                                    setState(() {
-                                      brightnessSlider = brightness;
-                                      notifySlider = notify;
-                                    })
-                                  },
-                                ),
-                                UartWidget(
-                                  sendString: _sendString,
-                                  appPath: _appPath,
-                                  show: showConsole,
-                                  content: uartContent,
-                                  scrollController: uartScrollController,
-                                  onChanged: (show) => {
-                                    setState(() => {showConsole = show})
-                                  },
-                                )
-                              ],
+                      : dfuRunning
+                          ? UploadWidget(
+                              progress: dfuProgress,
+                              state: uploadState,
                             )
-                          : (StatusWidget(
-                              state: connectingState, watch: watch)),
+                          : connectingState == 4
+                              ? Column(
+                                  children: [
+                                    DeviceWidget(
+                                      sendString: _sendString,
+                                      appPath: _appPath,
+                                      name: watch,
+                                      address: watchAddress,
+                                      batteryLevel: batteryLevel,
+                                      lastSync: lastSync,
+                                      onChanged: (state, file) {
+                                        if (watch == null ||
+                                            (connectingState != 3 &&
+                                                connectingState != 4) ||
+                                            memoryError) {
+                                          return;
+                                        }
+                                        if (state == 0) {
+                                          doDfu(watchAddress, file);
+
+                                          _sendString("import machine");
+                                          _sendString(
+                                              "machine.enter_ota_dfu()");
+                                        } else {
+                                          downloadWebBuild(state == 1
+                                              ? "actions"
+                                              : "release");
+                                        }
+                                      },
+                                    ),
+                                    _appPath("AlarmApp") != ""
+                                        ? AlarmWidget(
+                                            sendString: _sendString,
+                                            appPath: _appPath,
+                                            enabled: alarmAppEnabled,
+                                            hours: alarmAppHours,
+                                            minutes: alarmAppMinutes,
+                                            time: alarmAppTime,
+                                            onChanged: (enabled, hours, minutes,
+                                                    time) =>
+                                                {
+                                              setState(() {
+                                                alarmAppEnabled = enabled;
+                                                alarmAppHours = hours;
+                                                alarmAppMinutes = minutes;
+                                                alarmAppTime = time;
+                                              })
+                                            },
+                                          )
+                                        : (Container()),
+                                    clockPath != ""
+                                        ? ClockWidget(
+                                            sendString: _sendString,
+                                            appPath: _appPath,
+                                            faceId: clockFaceId,
+                                            clockPath: clockPath,
+                                            onChanged: (faceId) => {
+                                                  setState(() {
+                                                    clockFaceId = faceId;
+                                                  })
+                                                })
+                                        : (Container()),
+                                    _appPath("StepCounterApp") != ""
+                                        ? StepsWidget(
+                                            sendString: _sendString,
+                                            appPath: _appPath,
+                                            steps: steps,
+                                            history: stepsHistoryMap)
+                                        : (Container()),
+                                    SettingsWidget(
+                                      sendString: _sendString,
+                                      appPath: _appPath,
+                                      brightness: brightnessSlider,
+                                      notify: notifySlider,
+                                      onChanged: (brightness, notify) => {
+                                        setState(() {
+                                          brightnessSlider = brightness;
+                                          notifySlider = notify;
+                                        })
+                                      },
+                                    ),
+                                    UartWidget(
+                                      sendString: _sendString,
+                                      appPath: _appPath,
+                                      show: showConsole,
+                                      content: uartContent,
+                                      scrollController: uartScrollController,
+                                      onChanged: (show) => {
+                                        setState(() => {showConsole = show})
+                                      },
+                                    )
+                                  ],
+                                )
+                              : (StatusWidget(
+                                  state: connectingState, watch: watch)),
                 ],
               ),
             ),
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => {connectingState != 0 ? _disconnect() : _connect()},
-        tooltip: connectingState != 0 ? 'Disconnect' : 'Connect',
-        child: Icon(connectingState != 0 ? Icons.close : Icons.sync),
-        focusElevation: 30,
-      ),
+      floatingActionButton: dfuRunning != true
+          ? FloatingActionButton(
+              onPressed: () =>
+                  {connectingState != 0 ? _disconnect() : _connect()},
+              tooltip: connectingState != 0 ? 'Disconnect' : 'Connect',
+              child: Icon(connectingState != 0 ? Icons.close : Icons.sync),
+              focusElevation: 30,
+            )
+          : Container(),
     );
   }
 }

@@ -168,7 +168,8 @@ public class MainActivity extends FlutterActivity {
                     method = "watchConnected";
                     data = new HashMap < String,
                             Object > ();
-                    data.put("data", intent.getStringExtra("io.github.taitberlette.wasp_os_companion.data"));
+                    data.put("main", intent.getStringExtra("io.github.taitberlette.wasp_os_companion.main"));
+                    data.put("extra", intent.getStringExtra("io.github.taitberlette.wasp_os_companion.extra"));
                     break;
                 case "io.github.taitberlette.wasp_os_companion.watchConnecting":
                     method = "watchConnecting";

@@ -218,7 +218,7 @@ public class MyService extends IntentService {
                 nowPlayingTrack = "";;
                 connectionState = 3;
 
-                broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchConnected", bleGatt.getDevice().getName());
+                broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchConnected", bleGatt.getDevice().getName(), bleGatt.getDevice().getAddress());
 
             } else {
                 bleGatt.disconnect();

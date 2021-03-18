@@ -24,6 +24,8 @@ dependencies:
   flutter:
     sdk: flutter
 
+  http: ^0.13.0
+
   permission_handler: ^4.2.0+hotfix.3
 
   path_provider:
@@ -31,6 +33,13 @@ dependencies:
   cupertino_icons: ^1.0.0
 
   flutter_colorpicker: ^0.3.2
+
+  file_picker: ^3.0.0
+
+  archive: ^3.1.2
+
+  flutter_nordic_dfu:
+    git: https://github.com/fengqiangboy/flutter-nordic-dfu.git
 
 dev_dependencies:
   flutter_test:
