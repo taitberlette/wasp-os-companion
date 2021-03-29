@@ -8,11 +8,16 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.database.Cursor;
 import android.media.AudioManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.SystemClock;
+import android.provider.ContactsContract;
+import android.telecom.TelecomManager;
+import android.telephony.TelephonyManager;
 import android.view.KeyEvent;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -41,6 +46,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -68,7 +75,7 @@ public class MyService extends IntentService {
     public static BluetoothGattCharacteristic uartTX;
     public static BluetoothGattDescriptor cccd;
 
-    public static Vector < String > commandList = new Vector < String > ();
+    public static Vector<String> commandList = new Vector<String>();
 
     public static String commandText = "";
     public static String responseText = "";
@@ -84,45 +91,58 @@ public class MyService extends IntentService {
     public static String nowPlayingAlbum = "";
     public static String nowPlayingTrack = "";
 
+    public static String nowCallingNumber = "";
+    public static String nowCallingName = "";
+
     public static int lastNotificationId = -1;
 
     public static String[] quickRing = new String[0];
     public static String[] launcherRing = new String[0];
 
+    PhoneReceiver phoneReceiver;
     MediaReceiver mediaReceiver;
     NotificationReceiver notificationReceiver;
 
     public static boolean scanning = false;
     public static boolean foundDevice = false;
 
-    private ScanCallback leScanCallback = new ScanCallback() {@Override
-    public void onScanResult(int callbackType, ScanResult result) {
-        super.onScanResult(callbackType, result);
-        String name = result.getDevice().getName();
-        String address = result.getDevice().getAddress();
-        if (foundDevice || name == null) {
-            return;
+    private ScanCallback leScanCallback = new ScanCallback() {
+        @Override
+        public void onScanResult(int callbackType, ScanResult result) {
+            super.onScanResult(callbackType, result);
+            String name = result.getDevice().getName();
+            String address = result.getDevice().getAddress();
+            if (foundDevice || name == null) {
+                return;
+            }
+            if (name.equals("PineTime") || name.equals("P8") || name.equals("K9")) {
+                foundDevice = true;
+                connectToWatch(address, name);
+            }
         }
-        if (name.equals("PineTime") || name.equals("P8") || name.equals("K9")) {
-            foundDevice = true;
-            connectToWatch(address, name);
-        }
-    }
     };
 
     private Handler handler = new Handler();
 
-    public final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {@Override
-    public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+    public final BluetoothGattCallback gattCallback = new BluetoothGattCallback() {
+        @Override
+        public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
 
-        super.onConnectionStateChange(gatt, status, newState);
-        if (newState == BluetoothProfile.STATE_CONNECTED) {
-            connectionState = 2;
+            super.onConnectionStateChange(gatt, status, newState);
+            if (newState == BluetoothProfile.STATE_CONNECTED) {
+                connectionState = 2;
 
-            gatt.discoverServices();
+                gatt.discoverServices();
 
-            bleGatt = gatt;
+                bleGatt = gatt;
+                if (phoneReceiver == null) {
 
+                IntentFilter phoneFilter = new IntentFilter();
+                phoneFilter.addAction("android.intent.action.PHONE_STATE");
+                phoneReceiver = new PhoneReceiver();
+                registerReceiver(phoneReceiver, phoneFilter);
+
+            }
             if (mediaReceiver == null) {
                 IntentFilter mediaFilter = new IntentFilter();
                 mediaFilter.addAction("com.android.music.metachanged");
@@ -154,9 +174,11 @@ public class MyService extends IntentService {
 
             broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchDisconnected");
 
+            unregisterReceiver(phoneReceiver);
             unregisterReceiver(mediaReceiver);
             unregisterReceiver(notificationReceiver);
 
+            phoneReceiver = null;
             mediaReceiver = null;
             notificationReceiver = null;
 
@@ -235,7 +257,6 @@ public class MyService extends IntentService {
                     String text = new String(uartTX.getValue());
 
                     broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchUart", text);
-
                     if (responseWaiting) {
                         if (text.trim().startsWith(">>>") || text.trim().startsWith("...")) {
                             responseText = responseText.replace(commandText.trim(), "");
@@ -445,8 +466,6 @@ public class MyService extends IntentService {
             Log.e("background service", "Unable to get BluetoothAdapter.");
         }
 
-        // JUST A TEST
-        // handleCommand("{\"t\": \"fetch\", \"n\": {\"method\": \"get\", \"app\": \"none\", \"url\": \"https://jsonplaceholder.typicode.com/todos/1\"}}");
     }
 
     public void handleCommand(String command) {
@@ -473,6 +492,8 @@ public class MyService extends IntentService {
             action = json.getString("t");
         } catch(Exception e) {}
 
+        Log.d("background", "watch request action: "+action);
+
         try {
             if (action.equals("music")) {
                 String info = json.getString("n");
@@ -496,7 +517,23 @@ public class MyService extends IntentService {
                         lastTrack();
                         break;
                 }
-            } else if (action.equals("fetch")) {
+            } else if(action.equals("call")){
+                String cmd = json.getString("n");
+                switch(cmd.toLowerCase()){
+                    case "accept":
+                    case "start":
+                        acceptCall();
+                        break;
+                    case "reject":
+                    case "end":
+                        rejectCall();
+                        break;
+                    case "ignore":
+                        //do nothing
+                        break;
+                }
+
+            }else if (action.equals("fetch")) {
                 String method = json.getString("m");
                 String url = json.getString("u");
                 String app = json.getString("a");
@@ -505,84 +542,27 @@ public class MyService extends IntentService {
                     return;
                 }
 
-                switch (url) {
+                switch (method) {
                     case "post":
-                        AndroidNetworking.post(url).setPriority(Priority.LOW).build().getAsString(new StringRequestListener() {@Override
-                        public void onResponse(String response) {
-                            response = response.replaceAll("[\r\n]+", " ");
-                            writeData(appPath(app, 2) + "._network(True, \"\"\"" + response + "\"\"\")");
-
-                        }@Override
-                        public void onError(ANError error) {
-                            writeData(appPath(app, 2) + "._network(False, '')");
-                        }
-                        });
+                        AndroidNetworking.post(url).setPriority(Priority.HIGH).build().getAsString(networkResponse(app));
                         break;
                     case "put":
-                        AndroidNetworking.put(url).setPriority(Priority.LOW).build().getAsString(new StringRequestListener() {@Override
-                        public void onResponse(String response) {
-                            response = response.replaceAll("[\r\n]+", " ");
-                            writeData(appPath(app, 2) + "._network(True, \"\"\"" + response + "\"\"\")");
-                        }@Override
-                        public void onError(ANError error) {
-                            writeData(appPath(app, 2) + "._network(False, '')");
-                        }
-                        });
+                        AndroidNetworking.put(url).setPriority(Priority.HIGH).build().getAsString(networkResponse(app));
                         break;
                     case "patch":
-                        AndroidNetworking.patch(url).setPriority(Priority.LOW).build().getAsString(new StringRequestListener() {@Override
-                        public void onResponse(String response) {
-                            response = response.replaceAll("[\r\n]+", " ");
-                            writeData(appPath(app, 2) + "._network(True, \"\"\"" + response + "\"\"\")");
-                        }@Override
-                        public void onError(ANError error) {
-                            writeData(appPath(app, 2) + "._network(False, '')");
-                        }
-                        });
+                        AndroidNetworking.patch(url).setPriority(Priority.HIGH).build().getAsString(networkResponse(app));
                         break;
                     case "delete":
-                        AndroidNetworking.delete(url).setPriority(Priority.LOW).build().getAsString(new StringRequestListener() {@Override
-                        public void onResponse(String response) {
-                            response = response.replaceAll("[\r\n]+", " ");
-                            writeData(appPath(app, 2) + "._network(True, \"\"\"" + response + "\"\"\")");
-                        }@Override
-                        public void onError(ANError error) {
-                            writeData(appPath(app, 2) + "._network(False, '')");
-                        }
-                        });
+                        AndroidNetworking.delete(url).setPriority(Priority.HIGH).build().getAsString(networkResponse(app));
                         break;
                     case "head":
-                        AndroidNetworking.head(url).setPriority(Priority.LOW).build().getAsString(new StringRequestListener() {@Override
-                        public void onResponse(String response) {
-                            response = response.replaceAll("[\r\n]+", " ");
-                            writeData(appPath(app, 2) + "._network(True, \"\"\"" + response + "\"\"\")");
-                        }@Override
-                        public void onError(ANError error) {
-                            writeData(appPath(app, 2) + "._network(False, '')");
-                        }
-                        });
+                        AndroidNetworking.head(url).setPriority(Priority.HIGH).build().getAsString(networkResponse(app));
                         break;
                     case "options":
-                        AndroidNetworking.options(url).setPriority(Priority.LOW).build().getAsString(new StringRequestListener() {@Override
-                        public void onResponse(String response) {
-                            response = response.replaceAll("[\r\n]+", " ");
-                            writeData(appPath(app, 2) + "._network(True, \"\"\"" + response + "\"\"\")");
-                        }@Override
-                        public void onError(ANError error) {
-                            writeData(appPath(app, 2) + "._network(False, '')");
-                        }
-                        });
+                        AndroidNetworking.options(url).setPriority(Priority.HIGH).build().getAsString(networkResponse(app));
                         break;
                     default:
-                        AndroidNetworking.get(url).setPriority(Priority.LOW).build().getAsString(new StringRequestListener() {@Override
-                        public void onResponse(String response) {
-                            response = response.replaceAll("[\r\n]+", " ");
-                            writeData(appPath(app, 2) + "._network(True, \"\"\"" + response + "\"\"\")");
-                        }@Override
-                        public void onError(ANError error) {
-                            writeData(appPath(app, 2) + "._network(False, '')");
-                        }
-                        });
+                        AndroidNetworking.get(url).setPriority(Priority.HIGH).build().getAsString(networkResponse(app));
                         break;
                 }
             }
@@ -737,6 +717,34 @@ public class MyService extends IntentService {
         sendBroadcast(intent);
     }
 
+    private void acceptCall() {
+        TelecomManager tm = (TelecomManager) getApplicationContext().getSystemService(Context.TELECOM_SERVICE);
+
+        if (tm != null) {
+            try{
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    tm.acceptRingingCall();
+                }
+            }catch(SecurityException exception){
+                Log.e("background", exception.toString());
+            }
+        }
+    }
+
+    private void rejectCall() {
+        TelecomManager tm = (TelecomManager) getApplicationContext().getSystemService(Context.TELECOM_SERVICE);
+
+        if (tm != null) {
+            try{
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    tm.endCall();
+                }
+            }catch(SecurityException exception){
+                Log.e("background", exception.toString());
+            }
+        }
+    }
+
     private void volDown() {
         AudioManager audioManager = (AudioManager) getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
         audioManager.adjustVolume(AudioManager.ADJUST_LOWER, AudioManager.FLAG_PLAY_SOUND);
@@ -791,6 +799,84 @@ public class MyService extends IntentService {
         audioManager.dispatchMediaKeyEvent(upEvent);
     }
 
+    private StringRequestListener networkResponse (String app) {
+        return new StringRequestListener() {@Override
+            public void onResponse(String response) {
+                response = response.replaceAll("[\r\n]+", " ");
+                writeData(appPath(app, 2) + "._network(True, \"\"\"" + response + "\"\"\")");
+
+            }@Override
+            public void onError(ANError error) {
+                writeData(appPath(app, 2) + "._network(False, '')");
+            }
+        };
+    };
+
+    public class PhoneReceiver extends BroadcastReceiver {
+
+        @Override
+        public void onReceive(Context context, Intent intent) {
+
+            if (intent == null) {
+                return;
+            }
+
+            String callingNumber = intent.getStringExtra("incoming_number");
+            String callingName = getContactDisplayNameByNumber(callingNumber);
+            String state = intent.getStringExtra("state");
+            String cmd = "incoming";
+
+            if(callingNumber == null){
+                return;
+            }
+
+            if(callingName == null){
+                callingName = "";
+            }
+
+            if(state.equals(TelephonyManager.EXTRA_STATE_RINGING)){
+                cmd = "incoming";
+                nowCallingName = callingName;
+                nowCallingNumber = callingNumber;
+            }
+            if ((state.equals(TelephonyManager.EXTRA_STATE_OFFHOOK))){
+                cmd = "accept";
+            }
+            if (state.equals(TelephonyManager.EXTRA_STATE_IDLE)){
+                cmd = "end";
+            }
+
+            if (connectionState == 3) {
+                writeData("wasp.system.set_phone_state({ \"cmd\": \"" + cmd + "\", \"name\": \"" + callingName + "\", \"number\": \"" + callingNumber + "\"})");
+            }
+        }
+
+        String getContactDisplayNameByNumber(String number) {
+            Uri uri;
+            if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.ENTERPRISE_CONTENT_FILTER_URI, Uri.encode(number));
+            } else {
+                uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(number));
+            }
+            String name = "Unknown Caller";
+
+            if (number == null || number.equals("")) {
+                return name;
+            }
+
+            try (Cursor contactLookup = getApplicationContext().getContentResolver().query(uri, null, null, null, null)) {
+                if (contactLookup != null && contactLookup.getCount() > 0) {
+                    contactLookup.moveToNext();
+                    name = contactLookup.getString(contactLookup.getColumnIndex(ContactsContract.Data.DISPLAY_NAME));
+                }
+            } catch (SecurityException e) {
+                // ignore, just return name below
+            }
+
+            return name;
+        }
+    }
+    
     public class MediaReceiver extends BroadcastReceiver {
 
         @Override
