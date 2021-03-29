@@ -484,7 +484,9 @@ class _Home extends State<Home> {
               ? _appPath("FibonacciClockApp", 0)
               : _appPath("ChronoApp", 0) != ""
                   ? _appPath("ChronoApp", 0)
-                  : _appPath("WordClockApp", 0);
+                  : _appPath("WordClockApp", 0) != ""
+                      ? _appPath("WordClockApp")
+                      : _appPath("DualClockApp");
 
       clockFaceId = _appPath("ClockApp", 0) != ""
           ? 1
@@ -492,7 +494,9 @@ class _Home extends State<Home> {
               ? 2
               : _appPath("ChronoApp", 0) != ""
                   ? 3
-                  : 4;
+                  : _appPath("WordClockApp", 0) != ""
+                      ? 4
+                      : 5;
     });
 
     if (_appPath("AlarmApp") != "") {

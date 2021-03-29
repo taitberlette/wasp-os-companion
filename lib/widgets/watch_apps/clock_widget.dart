@@ -62,6 +62,10 @@ class _ClockWidgetState extends State<ClockWidget> {
                 DropdownMenuItem(
                   child: Text("Word Clock"),
                   value: 4,
+                ),
+                DropdownMenuItem(
+                  child: Text("Dual Clock"),
+                  value: 5,
                 )
               ],
               onChanged: (value) {
@@ -82,6 +86,10 @@ class _ClockWidgetState extends State<ClockWidget> {
                     widget
                         .sendString("from apps.word_clock import WordClockApp");
                     widget.sendString("${widget.clockPath} = WordClockApp()");
+                  } else if (value == 5) {
+                    widget
+                        .sendString("from apps.dual_clock import DualClockApp");
+                    widget.sendString("${widget.clockPath} = DualClockApp()");
                   }
                   widget.sendString("wasp.system.switch(${widget.clockPath})");
 
