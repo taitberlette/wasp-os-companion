@@ -466,10 +466,6 @@ class _Home extends State<Home> {
     commandText = "";
     memoryError = false;
 
-    DateTime now = new DateTime.now();
-    _sendString(
-        "watch.rtc.set_localtime((${now.year},${now.month},${now.day},${now.hour},${now.minute},${now.second}))");
-
     _sendString("wasp.system.quick_ring");
 
     _sendString("wasp.system.launcher_ring");

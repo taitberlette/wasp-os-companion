@@ -1,5 +1,6 @@
 package io.github.taitberlette.wasp_os_companion;
 
+import android.Manifest;
 import android.app.IntentService;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
@@ -8,6 +9,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.PackageManager;
 import android.database.Cursor;
 import android.media.AudioManager;
 import android.net.Uri;
@@ -29,7 +31,9 @@ import android.bluetooth.BluetoothGattService;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothProfile;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.app.ActivityCompat;
 import androidx.core.app.NotificationCompat;
 
 import android.util.Log;
@@ -39,6 +43,7 @@ import com.androidnetworking.common.ANRequest;
 import com.androidnetworking.common.Priority;
 import com.androidnetworking.error.ANError;
 import com.androidnetworking.interfaces.JSONArrayRequestListener;
+import com.androidnetworking.interfaces.JSONObjectRequestListener;
 import com.androidnetworking.interfaces.StringRequestListener;
 
 import org.json.JSONArray;
@@ -49,6 +54,8 @@ import java.io.UnsupportedEncodingException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.Vector;
@@ -103,6 +110,7 @@ public class MyService extends IntentService {
     MediaReceiver mediaReceiver;
     NotificationReceiver notificationReceiver;
 
+
     public static boolean scanning = false;
     public static boolean foundDevice = false;
 
@@ -135,71 +143,73 @@ public class MyService extends IntentService {
                 gatt.discoverServices();
 
                 bleGatt = gatt;
+
+
                 if (phoneReceiver == null) {
 
-                IntentFilter phoneFilter = new IntentFilter();
-                phoneFilter.addAction("android.intent.action.PHONE_STATE");
-                phoneReceiver = new PhoneReceiver();
-                registerReceiver(phoneReceiver, phoneFilter);
+                    IntentFilter phoneFilter = new IntentFilter();
+                    phoneFilter.addAction("android.intent.action.PHONE_STATE");
+                    phoneReceiver = new PhoneReceiver();
+                    registerReceiver(phoneReceiver, phoneFilter);
 
+                }
+                if (mediaReceiver == null) {
+                    IntentFilter mediaFilter = new IntentFilter();
+                    mediaFilter.addAction("com.android.music.metachanged");
+                    mediaFilter.addAction("com.android.music.playstatechanged");
+                    mediaFilter.addAction("com.android.music.playbackcomplete");
+                    mediaFilter.addAction("com.android.music.queuechanged");
+                    mediaFilter.addAction("fm.last.android.metachanged");
+                    mediaFilter.addAction("com.sec.android.app.music.metachanged");
+                    mediaFilter.addAction("com.nullsoft.winamp.metachanged");
+                    mediaFilter.addAction("com.amazon.mp3.metachanged");
+                    mediaFilter.addAction("com.miui.player.metachanged");
+                    mediaFilter.addAction("com.real.IMP.metachanged");
+                    mediaFilter.addAction("com.sonyericsson.music.metachanged");
+                    mediaFilter.addAction("com.rdio.android.metachanged");
+                    mediaFilter.addAction("com.samsung.sec.android.MusicPlayer.metachanged");
+                    mediaFilter.addAction("com.andrew.apollo.metachanged");
+                    mediaFilter.addAction("com.spotify.music.metadatachanged");
+                    mediaReceiver = new MediaReceiver();
+                    registerReceiver(mediaReceiver, mediaFilter);
+                }
+                if (notificationReceiver == null) {
+                    IntentFilter notificationFilter = new IntentFilter();
+                    notificationFilter.addAction("io.github.taitberlette.wasp_os_companion.notificationEvent");
+                    notificationReceiver = new NotificationReceiver();
+                    registerReceiver(notificationReceiver, notificationFilter);
+                }
+            } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                connectionState = 0;
+
+                broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchDisconnected");
+
+                unregisterReceiver(phoneReceiver);
+                unregisterReceiver(mediaReceiver);
+                unregisterReceiver(notificationReceiver);
+
+                phoneReceiver = null;
+                mediaReceiver = null;
+                notificationReceiver = null;
+
+                responseWaiting = false;
+                haltCommands = false;
+                responseText = "";
+                commandText = "";
+                actionText = "";
+                commandList.clear();
+                currentPacket = new byte[0];
+                sentPacket = new byte[0];
+                lastNotificationId = -1;
+                nowPlayingArtist = "";
+                nowPlayingAlbum = "";
+                nowPlayingTrack = "";
+                uartService = null;
+                uartRX = null;
+                uartTX = null;
+                cccd = null;
             }
-            if (mediaReceiver == null) {
-                IntentFilter mediaFilter = new IntentFilter();
-                mediaFilter.addAction("com.android.music.metachanged");
-                mediaFilter.addAction("com.android.music.playstatechanged");
-                mediaFilter.addAction("com.android.music.playbackcomplete");
-                mediaFilter.addAction("com.android.music.queuechanged");
-                mediaFilter.addAction("fm.last.android.metachanged");
-                mediaFilter.addAction("com.sec.android.app.music.metachanged");
-                mediaFilter.addAction("com.nullsoft.winamp.metachanged");
-                mediaFilter.addAction("com.amazon.mp3.metachanged");
-                mediaFilter.addAction("com.miui.player.metachanged");
-                mediaFilter.addAction("com.real.IMP.metachanged");
-                mediaFilter.addAction("com.sonyericsson.music.metachanged");
-                mediaFilter.addAction("com.rdio.android.metachanged");
-                mediaFilter.addAction("com.samsung.sec.android.MusicPlayer.metachanged");
-                mediaFilter.addAction("com.andrew.apollo.metachanged");
-                mediaFilter.addAction("com.spotify.music.metadatachanged");
-                mediaReceiver = new MediaReceiver();
-                registerReceiver(mediaReceiver, mediaFilter);
-            }
-            if (notificationReceiver == null) {
-                IntentFilter notificationFilter = new IntentFilter();
-                notificationFilter.addAction("io.github.taitberlette.wasp_os_companion.notificationEvent");
-                notificationReceiver = new NotificationReceiver();
-                registerReceiver(notificationReceiver, notificationFilter);
-            }
-        } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-            connectionState = 0;
-
-            broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchDisconnected");
-
-            unregisterReceiver(phoneReceiver);
-            unregisterReceiver(mediaReceiver);
-            unregisterReceiver(notificationReceiver);
-
-            phoneReceiver = null;
-            mediaReceiver = null;
-            notificationReceiver = null;
-
-            responseWaiting = false;
-            haltCommands = false;
-            responseText = "";
-            commandText = "";
-            actionText = "";
-            commandList.clear();
-            currentPacket = new byte[0];
-            sentPacket = new byte[0];
-            lastNotificationId = -1;
-            nowPlayingArtist = "";
-            nowPlayingAlbum = "";
-            nowPlayingTrack = "";
-            uartService = null;
-            uartRX = null;
-            uartTX = null;
-            cccd = null;
         }
-    }
 
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
@@ -237,15 +247,22 @@ public class MyService extends IntentService {
                 lastNotificationId = -1;
                 nowPlayingArtist = "";
                 nowPlayingAlbum = "";
-                nowPlayingTrack = "";;
-                connectionState = 3;
-
-                broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchConnected", bleGatt.getDevice().getName(), bleGatt.getDevice().getAddress());
+                nowPlayingTrack = "";
 
             } else {
                 bleGatt.disconnect();
                 broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchDisconnected");
             }
+        }
+
+        @Override
+        public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status) {
+            super.onDescriptorWrite(gatt, descriptor, status);
+
+            connectionState = 3;
+
+            broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchConnected", bleGatt.getDevice().getName(), bleGatt.getDevice().getAddress());
+            backgroundSync();
         }
 
         @Override
@@ -255,6 +272,7 @@ public class MyService extends IntentService {
 
                 if (characteristic.getUuid().equals(uartTXUUID)) {
                     String text = new String(uartTX.getValue());
+
 
                     broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchUart", text);
                     if (responseWaiting) {
@@ -295,7 +313,7 @@ public class MyService extends IntentService {
                         }
                     }
                 }
-            } catch(Exception e) {
+            } catch (Exception e) {
 
             }
         }
@@ -312,7 +330,7 @@ public class MyService extends IntentService {
                     if (currentPacket.length > 0) {
                         sendChunk(currentPacket);
                     }
-                } catch(Exception e) {
+                } catch (Exception e) {
 
                 }
             }
@@ -326,14 +344,15 @@ public class MyService extends IntentService {
         }
         if (!scanning) {
             foundDevice = false;
-            handler.postDelayed(new Runnable() {@Override
-                                public void run() {
-                                    scanning = false;
-                                    bleScanner.stopScan(leScanCallback);
-                                    if (foundDevice == false) {
-                                        broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchDisconnected");
+            handler.postDelayed(new Runnable() {
+                                    @Override
+                                    public void run() {
+                                        scanning = false;
+                                        bleScanner.stopScan(leScanCallback);
+                                        if (foundDevice == false) {
+                                            broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchDisconnected");
+                                        }
                                     }
-                                }
                                 },
                     5000);
 
@@ -413,7 +432,7 @@ public class MyService extends IntentService {
         byte[] bytes = new byte[0];
         try {
             bytes = data.getBytes("UTF8");
-        } catch(UnsupportedEncodingException e) {
+        } catch (UnsupportedEncodingException e) {
             e.printStackTrace();
         }
 
@@ -442,7 +461,6 @@ public class MyService extends IntentService {
     }
 
     public void writeBytes(byte[] data, BluetoothGattCharacteristic characteristic, BluetoothGatt gatt) {
-
         characteristic.setValue(data);
         characteristic.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT);
         gatt.writeCharacteristic(characteristic);
@@ -466,6 +484,46 @@ public class MyService extends IntentService {
             Log.e("background service", "Unable to get BluetoothAdapter.");
         }
 
+    }
+
+    public void backgroundSync() {
+        Log.d("background", "background sync");
+        if (connectionState == 3) {
+            Log.d("background", "background sync connected");
+
+            Date now = Calendar.getInstance().getTime();
+
+            int year = now.getYear() + 1900;
+            int month = now.getMonth() + 1;
+            int date = now.getDate();
+            int hour = now.getHours();
+            int minute = now.getMinutes();
+            int second = now.getSeconds();
+
+            String currentTime = "watch.rtc.set_localtime((" + year + ", " + month + ", " + date + ", " + hour + ", " + minute + ", " + second + "))";
+            writeData(currentTime);
+
+            writeData("wasp.system.quick_ring");
+            writeData("wasp.system.launcher_ring");
+
+
+            AndroidNetworking.get("https://wasp-os-companion.glitch.me/api/app/weather").setPriority(Priority.HIGH).build().getAsString(new StringRequestListener() {
+                @Override
+                public void onResponse(String response) {
+                    Log.d("background service", "got weather details: "+response);
+                    //this is currently just to help me pass the data easier, I'll probably change this in the future.
+                    response += "END";
+                    writeData("wasp.system.weatherinfo = {\"type\": \"weather\", "+response.replace("{\"error\":false,\"data\":{", "").replace("}END", ""));
+                }
+
+                @Override
+                public void onError(ANError anError) {
+
+                }
+            });
+
+            Log.d("background","current time: "+currentTime);
+        }
     }
 
     public void handleCommand(String command) {
@@ -677,7 +735,8 @@ public class MyService extends IntentService {
                     break;
                 case "io.github.taitberlette.wasp_os_companion.checkBluetooth":
                     if (connectionState != 0) {
-                        broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchConnected", bleGatt.getDevice().getName());
+                        broadcastUpdate("io.github.taitberlette.wasp_os_companion.watchConnected", bleGatt.getDevice().getName(), bleGatt.getDevice().getAddress());
+                        backgroundSync();
                     }
                     break;
                 case "io.github.taitberlette.wasp_os_companion.connectToBluetooth":
