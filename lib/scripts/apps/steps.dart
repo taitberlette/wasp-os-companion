@@ -37,6 +37,6 @@ class StepsApp extends WatchApp {
 
   @override
   bool active() {
-    return !Device.appInstalled("StepCounterApp");
+    return Device.appInstalled("StepCounterApp");
   }
 }
