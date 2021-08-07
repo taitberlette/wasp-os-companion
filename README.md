@@ -13,22 +13,45 @@ wasp-os companion is built on Flutter, with native Android code for background s
 To install the app, check [Github Actions](https://github.com/tb100/wasp-os-companion/actions) for the latest version.
 
 ## Features
- - Change current alarm.
- - Change clock face.
- - View steps (with history).
- - Change watch settings (brightness/notification level).
- - Change the watch theme.
- - Automatically sync the time.
- - UART console.
- - View watch battery percentage.
- - Save/load snake game high score.
- - Get phone notifications.
- - Get now playing media.
- - Control now playing media.
- - Update the watch with a new firmware version either from local storage, the latest [GitHub Action](https://github.com/daniel-thompson/wasp-os/actions), or the latest [GitHub Release](https://github.com/daniel-thompson/wasp-os/releases).
- - Allows watch apps to make web requests (see [networking](.docs/NETWORK.md)).
- - App UI mirrors watch applications (for example, if the alarm app isn't enabled, this app doesn't show options for the alarm app).
- - Runs in the background so you can get notifications and control music even if the app is closed.
+- Device
+    - See when the device was last Synced
+    - View the battery level of your device
+    - Update your device
+        - Recent Github releases
+        - Recent Github actions
+        - A local file on your phone
+    - Devtools
+        - View and modify the UART console
+        - Upload and download files from the file system
+        - Run the garbage collector on your watch
+    - Reboot your device
+ - Alarms
+    - Add or remove alarms
+    - Change the time of an alarm
+    - Modify the days the alarm is enabled
+- Faces
+    - Change the current clock face
+    - View a preview of each clock face
+- Games
+    - Saves your highscore on the snake game
+- Music *
+    - Control music playing on your phone
+    - View the currently playing song
+- Notifications *
+    - Get notification from your phone
+- Steps
+    - View recent step data
+    - See a graph that shows steps taken throughout a day
+- Settings
+    - Change the brightness
+    - Change the notification level
+    - Change the units
+    - Set a theme
+- Extra Features
+    - Apps can make network requests
+        - See [networking](.docs/NETWORK.md)
+
+###### * Works in the background with the app closed
  
 ## Tested Devices
 I only have a P8 smartwatch, so I haven't tested with PineTime or K9. Please make a pull request if you have tested the app with a new phone/watch.
@@ -40,7 +63,7 @@ I only have a P8 smartwatch, so I haven't tested with PineTime or K9. Please mak
 
 ## Screenshots
            
-<img src=".screenshots/Home.png" width="240" height="504"> <img src=".screenshots/Header.png" width="240" height="504"> <img src=".screenshots/Alarm_and_Clock_and_Steps.png" width="240" height="504"> <img src=".screenshots/UART_Console_and_Settings.png" width="240" height="504"> <img src=".screenshots/Alarm_Time_Picker.png" width="240" height="504"> <img src=".screenshots/Clock_Picker.png" width="240" height="504"> <img src=".screenshots/Theme_Picker.png" width="240" height="504"> <img src=".screenshots/UART_Demo.png" width="240" height="504"> <img src=".screenshots/Update_Picker.png" width="240" height="504"> <img src=".screenshots/Updating.png" width="240" height="504">
+<img src=".screenshots/Connect.png" width="240" height="504"> <img src=".screenshots/HomeTop.png" width="240" height="504"> <img src=".screenshots/HomeBottom.png" width="240" height="504"> <img src=".screenshots/Theme.png" width="240" height="504"> <img src=".screenshots/Options.png" width="240" height="504"> <img src=".screenshots/Devtools.png" width="240" height="504"> <img src=".screenshots/Alarm.gif" width="240" height="504"> <img src=".screenshots/Faces.gif" width="240" height="504"> <img src=".screenshots/Update.gif" width="240" height="504">
 
 
 

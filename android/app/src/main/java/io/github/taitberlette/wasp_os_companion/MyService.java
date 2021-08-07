@@ -339,7 +339,6 @@ public class MyService extends IntentService {
 
     private void scanForWatch() {
         if (bleAdapter == null) {
-            Log.w("background service", "BluetoothAdapter not initialized");
             return;
         }
         if (!scanning) {
@@ -367,7 +366,6 @@ public class MyService extends IntentService {
 
     private void connectToWatch(String address, String name) {
         if (bleAdapter == null || address == null) {
-            Log.w("background service", "BluetoothAdapter not initialized or unspecified address.");
             return;
         }
 
@@ -375,15 +373,12 @@ public class MyService extends IntentService {
 
         // Previously connected device.  Try to reconnect.
         if (address.equals(bleDeviceAddress) && bleGatt != null) {
-            Log.d("background service", "Trying to use an existing bleGatt for connection.");
 
             if (bleGatt.connect()) {
                 connectionState = 1;
-                Log.d("background service", "Connecting...");
                 return;
 
             } else {
-                Log.d("background service", "Can't connect...");
                 return;
             }
         }
@@ -391,21 +386,18 @@ public class MyService extends IntentService {
         final BluetoothDevice device = bleAdapter.getRemoteDevice(address);
 
         if (device == null) {
-            Log.w("background service", "Device not found.  Unable to connect.");
             return;
         }
 
         // We want to directly connect to the device, so we are setting the autoConnect
         // parameter to false.
         bleGatt = device.connectGatt(this, true, gattCallback);
-        Log.d("background service", "Trying to create a new connection.");
         bleDeviceAddress = address;
         connectionState = 1;
     }
 
     private void disconnectFromWatch() {
         if (bleAdapter == null || bleGatt == null) {
-            Log.w("background service", "BluetoothAdapter not initialized");
             return;
         }
         foundDevice = true;
@@ -472,7 +464,6 @@ public class MyService extends IntentService {
             bleManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
 
             if (bleManager == null) {
-                Log.e("background service", "Unable to initialize BluetoothManager.");
                 return;
             }
         }
@@ -480,16 +471,10 @@ public class MyService extends IntentService {
         bleAdapter = bleManager.getAdapter();
         bleScanner = BluetoothAdapter.getDefaultAdapter().getBluetoothLeScanner();
 
-        if (bleAdapter == null || !bleAdapter.isEnabled()) {
-            Log.e("background service", "Unable to get BluetoothAdapter.");
-        }
-
     }
 
     public void backgroundSync() {
-        Log.d("background", "background sync");
         if (connectionState == 3) {
-            Log.d("background", "background sync connected");
 
             Date now = Calendar.getInstance().getTime();
 
@@ -503,14 +488,9 @@ public class MyService extends IntentService {
             String currentTime = "watch.rtc.set_localtime((" + year + ", " + month + ", " + date + ", " + hour + ", " + minute + ", " + second + "))";
             writeData(currentTime);
 
-            writeData("wasp.system.quick_ring");
-            writeData("wasp.system.launcher_ring");
-
-
             AndroidNetworking.get("https://wasp-os-companion.glitch.me/api/app/weather").setPriority(Priority.HIGH).build().getAsString(new StringRequestListener() {
                 @Override
                 public void onResponse(String response) {
-                    Log.d("background service", "got weather details: "+response);
                     //this is currently just to help me pass the data easier, I'll probably change this in the future.
                     response += "END";
                     writeData("wasp.system.weatherinfo = {\"type\": \"weather\", "+response.replace("{\"error\":false,\"data\":{", "").replace("}END", ""));
@@ -521,8 +501,6 @@ public class MyService extends IntentService {
 
                 }
             });
-
-            Log.d("background","current time: "+currentTime);
         }
     }
 
@@ -549,8 +527,6 @@ public class MyService extends IntentService {
         try {
             action = json.getString("t");
         } catch(Exception e) {}
-
-        Log.d("background", "watch request action: "+action);
 
         try {
             if (action.equals("music")) {
