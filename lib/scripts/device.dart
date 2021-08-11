@@ -25,8 +25,8 @@ class Device {
   int connectState;
   bool syncing;
   bool updating;
+  bool askingNotifications;
   DeviceState state;
-
   DateTime syncTime;
 
   Device() {
@@ -35,6 +35,7 @@ class Device {
     connectState = 0;
     syncing = false;
     updating = false;
+    askingNotifications = false;
     state = DeviceState();
     syncTime = DateTime.now();
   }
@@ -50,7 +51,6 @@ class Device {
 
     methodChannel.invokeMethod("startBackgroundService");
 
-    Device.device = Device();
     Device.device.connectState = 1;
 
     deviceStreamController.sink.add(Device.device);
@@ -283,6 +283,16 @@ class Device {
     Device.collectMemory();
 
     return bytes;
+  }
+
+  // ask for watch notifications
+  static askNotifications() {
+    Device.device.askingNotifications = true;
+  }
+
+  // accept the notification request
+  static acceptNotifications() {
+    methodChannel.invokeMethod("acceptNotifications");
   }
 
   // dispose

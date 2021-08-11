@@ -25,6 +25,36 @@ class _HomeState extends State<Home> {
     super.initState();
 
     deviceSubscription = Device.deviceStream.listen(data);
+
+    if (Device.device.askingNotifications) {
+      Device.device.askingNotifications = false;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) => showDialog(
+            context: context,
+            builder: (BuildContext context) {
+              return AlertDialog(
+                title: Text("Enable watch notifications?"),
+                content: Text(
+                    "If you would like your notifications to show on your watch you need to enable the notification listener."),
+                actions: [
+                  OutlinedButton(
+                    child: Text("Accept"),
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Device.acceptNotifications();
+                    },
+                  ),
+                  OutlinedButton(
+                    child: Text("Cancel"),
+                    onPressed: () {
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
+              );
+            },
+          ));
+    }
   }
 
   @override

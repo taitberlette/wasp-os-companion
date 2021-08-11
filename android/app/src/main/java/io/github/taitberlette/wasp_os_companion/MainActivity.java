@@ -84,7 +84,15 @@ public class MainActivity extends FlutterActivity {
                     }
 
                 } else if (call.method.equals("acceptNotifications")) {
-                    startActivity(new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"));
+                    String app = getApplicationContext().getPackageName() + "/" + NotificationListener.class.getName();
+                    String key = ":settings:fragment_args_key";
+                    String show = ":settings:show_fragment_args";
+                    Intent intent = new Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS");
+                    intent.putExtra(key, app);
+                    Bundle bundle = new Bundle();
+                    bundle.putString(key, app);
+                    intent.putExtra(show, bundle);
+                    startActivity(intent);
                 } else {
                     result.notImplemented();
                 }

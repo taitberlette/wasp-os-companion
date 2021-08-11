@@ -17,6 +17,8 @@ void start() {
 
   methodChannel.setMethodCallHandler(channel);
 
+  methodChannel.invokeMethod("connectedToChannel");
+
   Device.start();
   Storage.start();
 }
@@ -47,6 +49,7 @@ Future<void> channel(MethodCall call) {
       Device.response(call.arguments["main"], call.arguments["extra"]);
       break;
     case "askNotifications":
+      Device.askNotifications();
       break;
   }
 
