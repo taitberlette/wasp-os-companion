@@ -82,6 +82,10 @@ public class MainActivity extends FlutterActivity {
                     if (!isNotificationServiceEnabled()) {
                         channel.invokeMethod("askNotifications", null);
                     }
+                    
+                    Intent intent = new Intent(context, MyService.class);
+                    intent.setAction("io.github.taitberlette.wasp_os_companion.checkBluetooth");
+                    startService(intent);
 
                 } else if (call.method.equals("acceptNotifications")) {
                     String app = getApplicationContext().getPackageName() + "/" + NotificationListener.class.getName();
@@ -110,10 +114,6 @@ public class MainActivity extends FlutterActivity {
         iF.addAction("io.github.taitberlette.wasp_os_companion.askNotifications");
         receiver = new BackgroundReceiver();
         registerReceiver(receiver, iF);
-
-        Intent intent = new Intent(context, MyService.class);
-        intent.setAction("io.github.taitberlette.wasp_os_companion.checkBluetooth");
-        startService(intent);
 
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
             if (checkSelfPermission(Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_DENIED || checkSelfPermission(Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_DENIED || checkSelfPermission(Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_DENIED || checkSelfPermission(Manifest.permission.ANSWER_PHONE_CALLS) == PackageManager.PERMISSION_DENIED || checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_DENIED || checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_DENIED) {
