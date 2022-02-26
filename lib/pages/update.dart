@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_nordic_dfu/flutter_nordic_dfu.dart';
+import 'package:nordic_dfu/nordic_dfu.dart';
 import 'package:http/http.dart';
 import 'package:waspos/pages/connect.dart';
 import 'package:waspos/pages/widgets/layout.dart';
@@ -219,7 +219,7 @@ class _UpdateState extends State<Update> {
         });
       }
 
-      await FlutterNordicDfu.startDfu(uuid, micropython.path,
+      await NordicDfu.startDfu(uuid, micropython.path,
           enableUnsafeExperimentalButtonlessServiceInSecureDfu: true,
           name: Device.device.name,
           numberOfPackets: 16, progressListener:

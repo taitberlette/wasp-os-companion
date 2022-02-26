@@ -30,7 +30,7 @@ jobs:
       - name: Setup Flutter
         uses: subosito/flutter-action@v1
         with:
-          flutter-version: '2.0.2'
+          flutter-version: '2.10.2'
 
       # Update Flutter if needed
       - name: Upgrade Flutter

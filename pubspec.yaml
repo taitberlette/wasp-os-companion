@@ -28,16 +28,15 @@ dependencies:
 
   shared_preferences: ^2.0.6
 
-  path_provider: ^2.0.2
+  path_provider: ^2.0.9
 
-  file_picker: ^3.0.4
+  file_picker: ^4.4.0
 
-  file_saver: ^0.0.10
+  file_saver: ^0.1.0
 
-  charts_flutter: ^0.11.0
+  charts_flutter: ^0.12.0
 
-  flutter_nordic_dfu:
-    git: https://github.com/fengqiangboy/flutter-nordic-dfu.git
+  nordic_dfu: ^3.3.0
 
 dev_dependencies:
   flutter_test:
