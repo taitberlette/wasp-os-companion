@@ -47,7 +47,7 @@ class Device {
 
   // connect to the watch
   static connect() {
-    if (Device.device.connectState != 0) return;
+    // if (Device.device.connectState != 0) return;
 
     methodChannel.invokeMethod("startBackgroundService");
 
@@ -60,7 +60,7 @@ class Device {
 
   // called when the native code is connecting
   static connecting(String name) {
-    if (Device.device.connectState == 0) return;
+    // if (Device.device.connectState == 0) return;
 
     Device.device.name = name;
     Device.device.connectState = 2;
@@ -70,7 +70,7 @@ class Device {
 
   // called when the native code is connected
   static connected(String name, String uuid) {
-    if (Device.device.connectState == 3) return;
+    // if (Device.device.connectState == 3) return;
 
     Device.device.name = name;
     Device.device.uuid = uuid;
@@ -83,7 +83,7 @@ class Device {
 
   // disconnect from the watch
   static disconnect() {
-    if (Device.device.connectState == 0) return;
+    // if (Device.device.connectState == 0) return;
 
     Device.device.connectState = 0;
 
@@ -94,7 +94,7 @@ class Device {
 
   // called when the native code is disconnected
   static disconnected() {
-    if (Device.device.connectState == 0) return;
+    // if (Device.device.connectState == 0) return;
 
     Device.device.connectState = 0;
 
@@ -114,7 +114,7 @@ class Device {
 
   // async function to send commands to the watch
   static Future<SendResponse> message(String command) async {
-    if (Device.device.connectState != 3) return null;
+    // if (Device.device.connectState != 3) return null;
 
     command = command.trim();
 
@@ -129,9 +129,9 @@ class Device {
 
   // sync the device
   static Future<void> sync() async {
-    if (Device.device.connectState != 3 ||
-        Device.device.syncing ||
-        Device.device.updating) return;
+    // if (Device.device.connectState != 3 ||
+    //     Device.device.syncing ||
+    //     Device.device.updating) return;
 
     Device.device.syncing = true;
 
