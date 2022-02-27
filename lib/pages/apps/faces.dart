@@ -18,6 +18,7 @@ class _FacesWidgetState extends State<FacesWidget> {
   // all the faces on the watch
   Map<String, Map<String, String>> faces = {
     "Default Clock": {"file": "clock", "class": "Clock"},
+    "Week Clock": {"file": "week_clock", "class": "WeekClock"},
     "Analogue Clock": {"file": "chrono", "class": "Chrono"},
     "Dual Clock": {"file": "dual_clock", "class": "DualClock"},
     "Fibonacci Clock": {"file": "fibonacci_clock", "class": "FibonacciClock"},
@@ -33,17 +34,20 @@ class _FacesWidgetState extends State<FacesWidget> {
     String clockAppName = Device.device.state.quickRing[0] ?? "ClockApp";
 
     switch (clockAppName) {
-      case "ChronoApp":
+      case "WeekClockApp":
         currentFace = 1;
         break;
-      case "DualClockApp":
+      case "ChronoApp":
         currentFace = 2;
         break;
-      case "FibonacciClockApp":
+      case "DualClockApp":
         currentFace = 3;
         break;
-      case "WordClockApp":
+      case "FibonacciClockApp":
         currentFace = 4;
+        break;
+      case "WordClockApp":
+        currentFace = 5;
         break;
     }
 
