@@ -962,8 +962,9 @@ public class MyService extends IntentService {
             if (connectionState == 3) {
                 if (command.equals("remove")) {
                     writeData("wasp.system.unnotify(" + id + ")");
-                } else {
-                    if (id == lastNotificationId) {
+                } else { 
+                    AudioManager audioManager = (AudioManager) getApplicationContext().getSystemService(Context.AUDIO_SERVICE);
+                    if (id == lastNotificationId || audioManager.getRingerMode() == AudioManager.RINGER_MODE_SILENT) {
                         return;
                     }
                     lastNotificationId = id;
